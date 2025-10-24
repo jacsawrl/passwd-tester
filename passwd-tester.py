@@ -1,23 +1,29 @@
 #!/usr/bin/env python3
-# psswd-tester.py
-# Uso: python3 psswd-tester.py
-#Made By Jacsaw
+# -*- coding: utf-8 -*-
+"""
+password_strength_checker.py
+Coloca rockyou.txt en la misma carpeta que este script.
+Uso: doble-clic desde .desktop o: python3 /ruta/al/script/password_strength_checker.py
+"""
 
 import os
 import re
-import time
+from pathlib import Path
 
-WORDLIST_FILE = "rockyou.txt"
-# Velocidad estimada de pruebas por segundo (depende de hardware, esto es aproximado)
-# Por ejemplo, 1 millón de contraseñas por segundo
-TRIES_PER_SECOND = 1_000_000  
+# Velocidad estimada de pruebas por segundo (ajusta según lo que quieras simular)
+TRIES_PER_SECOND = 1_000_000
 
-def load_wordlist():
-    if not os.path.isfile(WORDLIST_FILE):
-        print(f"Error: no se encontró la wordlist {WORDLIST_FILE}")
+def get_script_dir():
+    return os.path.dirname(os.path.abspath(__file__))
+
+def load_wordlist(filename="rockyou.txt"):
+    script_dir = get_script_dir()
+    path = Path(script_dir) / filename
+    if not path.is_file():
+        print(f"Error: no se encontró la wordlist en: {path}")
         return set()
-    print("[i] Cargando wordlist, esto puede tardar unos segundos...")
-    with open(WORDLIST_FILE, "r", encoding="latin-1", errors="ignore") as f:
+    print(f"[i] Cargando wordlist desde: {path} (esto puede tardar unos segundos)...")
+    with open(path, "r", encoding="latin-1", errors="ignore") as f:
         passwords = set(line.strip() for line in f if line.strip())
     print(f"[i] Wordlist cargada: {len(passwords)} contraseñas únicas")
     return passwords
@@ -29,7 +35,6 @@ def complexity_score(password):
     score = 0
     reasons = []
 
-    # Longitud
     l = len(password)
     if l >= 12:
         score += 3
@@ -40,31 +45,15 @@ def complexity_score(password):
     else:
         reasons.append("Muy corta (<6)")
 
-    # Letras minúsculas
-    if re.search(r"[a-z]", password):
-        score += 1
-    else:
-        reasons.append("Sin minúsculas")
+    if re.search(r"[a-z]", password): score += 1
+    else: reasons.append("Sin minúsculas")
+    if re.search(r"[A-Z]", password): score += 1
+    else: reasons.append("Sin mayúsculas")
+    if re.search(r"[0-9]", password): score += 1
+    else: reasons.append("Sin números")
+    if re.search(r"[^\w\s]", password): score += 1
+    else: reasons.append("Sin símbolos")
 
-    # Letras mayúsculas
-    if re.search(r"[A-Z]", password):
-        score += 1
-    else:
-        reasons.append("Sin mayúsculas")
-
-    # Números
-    if re.search(r"[0-9]", password):
-        score += 1
-    else:
-        reasons.append("Sin números")
-
-    # Símbolos
-    if re.search(r"[^\w\s]", password):
-        score += 1
-    else:
-        reasons.append("Sin símbolos")
-
-    # Entropía básica (caracteres únicos)
     unique_chars = len(set(password))
     if unique_chars < 4:
         reasons.append("Pocos caracteres únicos")
@@ -84,17 +73,15 @@ def classify_score(score, in_wordlist):
         return "EXCELENTE"
 
 def estimated_crack_time(password):
-    # Aproximación: tries per second * número total de combinaciones
     charset = 0
     if re.search(r"[a-z]", password): charset += 26
     if re.search(r"[A-Z]", password): charset += 26
     if re.search(r"[0-9]", password): charset += 10
-    if re.search(r"[^\w\s]", password): charset += 32  # símbolos comunes
+    if re.search(r"[^\w\s]", password): charset += 32
     if charset == 0:
-        charset = 26  # fallback
+        charset = 26
     combinations = charset ** len(password)
     seconds = combinations / TRIES_PER_SECOND
-    # convertir a unidades legibles
     if seconds < 60:
         return f"{seconds:.2f} segundos"
     minutes = seconds / 60
@@ -112,26 +99,30 @@ def estimated_crack_time(password):
 def main():
     wordlist = load_wordlist()
     if not wordlist:
+        print("Coloca 'rockyou.txt' junto al script y vuelve a ejecutar.")
         return
 
-    while True:
-        password = input("\nEscribe la contraseña a evaluar (o 'salir' para terminar): ").strip()
-        if password.lower() == "salir":
-            break
-        if not password:
-            continue
+    try:
+        while True:
+            password = input("\nEscribe la contraseña a evaluar (o 'salir' para terminar): ").strip()
+            if password.lower() == "salir":
+                break
+            if not password:
+                continue
 
-        in_wordlist = password_in_wordlist(password, wordlist)
-        score, reasons = complexity_score(password)
-        classification = classify_score(score, in_wordlist)
-        time_estimate = estimated_crack_time(password)
+            in_wordlist = password_in_wordlist(password, wordlist)
+            score, reasons = complexity_score(password)
+            classification = classify_score(score, in_wordlist)
+            time_estimate = estimated_crack_time(password)
 
-        print("\n===== RESULTADO =====")
-        print(f"Contraseña: {password}")
-        print(f"Clasificación: {classification}")
-        print(f"Razones / advertencias: {', '.join(reasons) if reasons else 'Ninguna'}")
-        print(f"Tiempo estimado de crackeo (fuerza bruta): {time_estimate}")
-        print("=====================\n")
+            print("\n===== RESULTADO =====")
+            print(f"Contraseña: {password}")
+            print(f"Clasificación: {classification}")
+            print(f"Razones / advertencias: {', '.join(reasons) if reasons else 'Ninguna'}")
+            print(f"Tiempo estimado de crackeo (fuerza bruta): {time_estimate}")
+            print("=====================\n")
+    except KeyboardInterrupt:
+        print("\nSaliendo...")
 
 if __name__ == "__main__":
     main()
